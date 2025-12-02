@@ -19,3 +19,6 @@ dist/
 
 # Logs
 *.log
+
+# Generated OCR exports
+output/

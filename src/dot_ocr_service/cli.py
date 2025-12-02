@@ -1,7 +1,13 @@
 import argparse
-import os
+from datetime import datetime
+from pathlib import Path
 
-from inference import DEFAULT_PROMPT, create_pipeline
+from .inference import DEFAULT_PROMPT, create_pipeline
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SAMPLE = PROJECT_ROOT / "samples" / "test.png"
+OUTPUT_DIR = PROJECT_ROOT / "output"
 
 
 def parse_args() -> argparse.Namespace:
@@ -9,7 +15,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "image_path",
         nargs="?",
-        default="samples/test.png",
+        default=str(DEFAULT_SAMPLE),
         help="待识别的图片路径，默认 samples/test.png",
     )
     parser.add_argument(
@@ -44,9 +50,10 @@ def parse_args() -> argparse.Namespace:
 
 def main():
     args = parse_args()
-    if not os.path.exists(args.image_path):
+    image_path = Path(args.image_path).expanduser()
+    if not image_path.exists():
         raise FileNotFoundError(
-            f"找不到图片文件 '{args.image_path}'，"
+            f"找不到图片文件 '{image_path}'，"
             "请检查路径或指定正确的文件"
         )
 
@@ -54,9 +61,9 @@ def main():
         load_in_4bit=not args.no_4bit,
         max_image_size=args.max_image_size,
     )
-    print(f"\n处理图片: {args.image_path}")
+    print(f"\n处理图片: {image_path}")
     result = pipeline.run_from_path(
-        args.image_path,
+        str(image_path),
         prompt=args.prompt,
         max_new_tokens=args.max_new_tokens,
         do_sample=args.do_sample,
@@ -66,6 +73,28 @@ def main():
     print("OCR 结果:")
     print("=" * 50)
     print(result)
+
+    # 确保输出目录存在
+    OUTPUT_DIR.mkdir(exist_ok=True)
+
+    # 生成输出文件路径
+    image_name = image_path.stem
+    output_file = OUTPUT_DIR / f"{image_name}.md"
+
+    # 生成 MD 内容
+    md_content = f"""---
+source: {image_path.name}
+processed_at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+---
+
+# OCR 识别结果
+
+{result}
+"""
+
+    # 写入文件
+    output_file.write_text(md_content, encoding='utf-8')
+    print(f"\n结果已保存至: {output_file}")
 
 
 if __name__ == "__main__":

@@ -23,7 +23,7 @@
 5. **AutoProcessor 加载失败（缺 video_processor）**：dots.ocr 没有 video component，`AutoProcessor` 抛出 `TypeError`。**处理**：分别加载 `AutoTokenizer` + `Qwen2VLImageProcessor`，手动合并输出。
 6. **image_grid_thw 等张量丢失导致 `NoneType`**：只传 `pixel_values` 入 `model.generate()`。**处理**：保留 processor 返回的所有键，和文本 input 一起 `to(device)` 并合并传入。
 7. **Prompt 与 img_mask 不匹配**：未插入 `<|imgpad|>`，`vision_embeddings` 与 `img_mask.sum()` 断言失败。**处理**：根据 `image_grid_thw` 计算所需 image token 个数，在 prompt 末尾补足 `<|imgpad|>`。
-8. **代码重复与参数漂移**：`ocr_infer.py` 与 `app.py` 各自维护 tokenizer/model，4-bit/FP16 控制混乱。**处理**：抽象 `DotOCRInference` 实例（`inference.py`），CLI/FastAPI 共享、由参数/环境变量控制 dtype/量化，避免重复 patch。
+8. **代码重复与参数漂移**：CLI (`dot_ocr_service.cli`) 与 FastAPI (`dot_ocr_service.api`) 若各自维护 tokenizer/model，4-bit/FP16 控制容易漂移。**处理**：抽象 `DotOCRInference` 模块（`dot_ocr_service.inference`），CLI/FastAPI 共享、由参数/环境变量控制 dtype/量化，避免重复 patch。
 
 ### 三、量化、显存与性能
 9. **CUDA OOM（Vision Tower attention）**：`device_map="auto"` 让全部参数上 GPU；高 token 数 attention 爆显存。**处理**：启用 `BitsAndBytesConfig(load_in_4bit=True)`、限长 `max_new_tokens`、图像最长边 ≤ 1024px，必要时退到 CPU。

@@ -1,11 +1,10 @@
+--extra-index-url https://download.pytorch.org/whl/cu121
 fastapi
 uvicorn[standard]
 transformers
 torch
+torchvision
+torchaudio
 Pillow
 bitsandbytes
 accelerate
-
-
-
-

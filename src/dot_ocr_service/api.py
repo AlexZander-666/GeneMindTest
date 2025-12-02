@@ -6,13 +6,17 @@ from fastapi import FastAPI, File, UploadFile
 from fastapi.responses import JSONResponse
 from PIL import Image
 
-from inference import DEFAULT_PROMPT, MODEL_ID, create_pipeline
+from .inference import DEFAULT_PROMPT, MODEL_ID, create_pipeline
 
 LOAD_IN_4BIT = os.environ.get("DOT_OCR_LOAD_IN_4BIT", "1") != "0"
 MAX_NEW_TOKENS = int(os.environ.get("DOT_OCR_MAX_NEW_TOKENS", "2048"))
 DO_SAMPLE = os.environ.get("DOT_OCR_DO_SAMPLE", "0") == "1"
+MAX_IMAGE_SIZE = int(os.environ.get("DOT_OCR_MAX_IMAGE_SIZE", "1024"))
 
-pipeline = create_pipeline(load_in_4bit=LOAD_IN_4BIT)
+pipeline = create_pipeline(
+    load_in_4bit=LOAD_IN_4BIT,
+    max_image_size=MAX_IMAGE_SIZE,
+)
 device = pipeline.device
 
 app = FastAPI(

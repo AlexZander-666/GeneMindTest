@@ -26,11 +26,16 @@ DEFAULT_PROMPT = (
 )
 
 
-def _disable_vision_bf16(model) -> None:
+def _disable_vision_bf16(model, target_dtype=torch.float16) -> None:
     """
     dots.ocr 的视觉塔默认会把输入强制转换为 bf16。
     在 4bit 量化 + RTX 30 系列 GPU 上会导致卷积 bias (fp16) 与输入 dtype 不匹配。
-    这里通过给 vision_tower.forward 打补丁，确保量化推理统一保持 fp16。
+    在 CPU 上会导致 bf16 与 float32 bias 不匹配。
+    这里通过给 vision_tower.forward 打补丁，确保推理时使用统一的 dtype。
+    
+    Args:
+        model: 模型实例
+        target_dtype: 目标数据类型，GPU 上用 float16，CPU 上用 float32
     """
     try:
         # vision_tower 直接在 DotsOCRForCausalLM 上，不在 model.model 里
@@ -46,13 +51,13 @@ def _disable_vision_bf16(model) -> None:
         original_forward = vision_tower.forward
 
         def forward_without_bf16(self, hidden_states, grid_thw, bf16=None):
-            if hidden_states.dtype != torch.float16:
-                hidden_states = hidden_states.to(torch.float16)
+            if hidden_states.dtype != target_dtype:
+                hidden_states = hidden_states.to(target_dtype)
             return original_forward(hidden_states, grid_thw, bf16=False)
 
         vision_tower.forward = MethodType(forward_without_bf16, vision_tower)
         vision_tower._bf16_disabled = True
-        print("Successfully patched vision_tower to disable bf16")
+        print(f"Successfully patched vision_tower to use {target_dtype}")
     except AttributeError:
         pass
 
@@ -124,6 +129,8 @@ class DotOCRInference:
             torch_dtype=torch.float32,
             trust_remote_code=True,
         )
+        # CPU 模式下也需要禁用 bf16，使用 float32
+        _disable_vision_bf16(model, target_dtype=torch.float32)
         return model.to(self.device)
 
     def _resize_image(self, image: Image.Image) -> Image.Image:
